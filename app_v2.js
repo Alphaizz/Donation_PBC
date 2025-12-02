@@ -104,62 +104,61 @@ async function updateUI() {
         console.log("Project data not found yet.");
     }
 }
-
-// --- UPDATED TIMELINE GALLERY FUNCTION ---
+//gallery shit shit
 async function loadProofGallery() {
     const gallery = document.getElementById("proofGallery");
     if (!gallery) return;
 
-    // Clear previous content
-    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Loading proofs from blockchain...</p>';
+    // Show loading state
+    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Scanning blockchain history...</p>';
 
     try {
-        // 1. Fetch ALL verification events (Bypassing the filter bug)
-        // We use 'earliest' instead of 0 to be safer with RPC nodes
+        // 1. Force fetch ALL MilestoneVerified events (No filtering on the node)
+        // This bypasses common RPC bugs where filters get ignored
         const events = await contract.getPastEvents('MilestoneVerified', {
-            fromBlock: 'earliest',
+            fromBlock: 0,
             toBlock: 'latest'
         });
 
-        // 2. Clear Loading Text
-        gallery.innerHTML = ""; 
+        console.log("Total Blockchain Events Found:", events.length);
 
-        // 3. Manual Filter & Render
-        let foundCount = 0;
+        // 2. Manual Filter in JavaScript (100% Accurate)
+        const projectEvents = events.filter(event => 
+            String(event.returnValues.projectId) === String(PROJECT_ID)
+        );
 
-        events.forEach(event => {
-            // MANUAL FILTER: Only show events for our Project ID
-            // We convert both to String to ensure they match (e.g. "2" == 2)
-            if (String(event.returnValues.projectId) === String(PROJECT_ID)) {
-                
-                foundCount++;
-                const milestoneIndex = event.returnValues.milestoneIndex;
-                const ipfsHash = event.returnValues.proofHash;
-                const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+        console.log(`Events for Project ${PROJECT_ID}:`, projectEvents.length);
 
-                const cardHtml = `
-                    <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
-                        <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
-                            <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
-                            Milestone #${Number(milestoneIndex) + 1} Verified
-                        </div>
-                        <a href="${imageUrl}" target="_blank">
-                            <img src="${imageUrl}" alt="Proof" style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
-                        </a>
-                    </div>
-                `;
-                gallery.innerHTML += cardHtml;
-            }
-        });
-
-        // 4. Handle "No Events Found" specifically for this ID
-        if (foundCount === 0) {
-            gallery.innerHTML = `<p style="font-style: italic; color: var(--text-muted);">No verified milestones found for Project ${PROJECT_ID}.</p>`;
+        if (projectEvents.length === 0) {
+            gallery.innerHTML = `<p style="font-style: italic; color: var(--text-muted);">No verified proofs found for Project #${PROJECT_ID} yet.</p>`;
+            return;
         }
+
+        // 3. Clear and Render
+        gallery.innerHTML = ""; 
+        
+        projectEvents.forEach(event => {
+            const milestoneIndex = event.returnValues.milestoneIndex;
+            const ipfsHash = event.returnValues.proofHash;
+            const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+
+            const cardHtml = `
+                <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
+                    <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
+                        <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
+                        Milestone #${Number(milestoneIndex) + 1} Verified
+                    </div>
+                    <a href="${imageUrl}" target="_blank">
+                        <img src="${imageUrl}" alt="Proof Image" style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
+                    </a>
+                </div>
+            `;
+            gallery.innerHTML += cardHtml;
+        });
 
     } catch (error) {
         console.error("Gallery Error:", error);
-        gallery.innerHTML = `<p style="color: red;">Connection Error. Please refresh.</p>`;
+        gallery.innerHTML = `<p style="color: red;">Error loading gallery. See Console.</p>`;
     }
 }
 // --- BUTTON LISTENERS ---
