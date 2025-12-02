@@ -37,3 +37,10 @@ def upload_proof():
         return jsonify({"error": str(e)}), 500
 
 # Note: No app.run() needed for Vercel
+# Add this at the very bottom of api/index.py
+from flask import send_from_directory
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    return "API is working. Please use the frontend.", 200
