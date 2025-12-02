@@ -104,43 +104,48 @@ async function updateUI() {
         console.log("Project data not found yet.");
     }
 }
-//gallery shit shit
+
+// --- FORCE FIX GALLERY FUNCTION ---
 async function loadProofGallery() {
     const gallery = document.getElementById("proofGallery");
     if (!gallery) return;
 
-    // Show loading state
-    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Scanning blockchain history...</p>';
+    // 1. Show Loading State
+    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Scanning for proofs...</p>';
 
     try {
-        // 1. Force fetch ALL MilestoneVerified events (No filtering on the node)
-        // This bypasses common RPC bugs where filters get ignored
+        // 2. Fetch ALL events (Bypassing filters)
         const events = await contract.getPastEvents('MilestoneVerified', {
             fromBlock: 0,
             toBlock: 'latest'
         });
 
-        console.log("Total Blockchain Events Found:", events.length);
+        console.log("🔍 DEBUG: Found Total Events:", events.length);
 
-        // 2. Manual Filter in JavaScript (100% Accurate)
+        // 3. Filter for CURRENT Project ID
         const projectEvents = events.filter(event => 
             String(event.returnValues.projectId) === String(PROJECT_ID)
         );
 
-        console.log(`Events for Project ${PROJECT_ID}:`, projectEvents.length);
+        console.log(`✅ DEBUG: Events for Project ${PROJECT_ID}:`, projectEvents.length);
 
+        // 4. Handle "No Events"
         if (projectEvents.length === 0) {
             gallery.innerHTML = `<p style="font-style: italic; color: var(--text-muted);">No verified proofs found for Project #${PROJECT_ID} yet.</p>`;
             return;
         }
 
-        // 3. Clear and Render
+        // 5. Clear and Render
         gallery.innerHTML = ""; 
         
         projectEvents.forEach(event => {
             const milestoneIndex = event.returnValues.milestoneIndex;
             const ipfsHash = event.returnValues.proofHash;
-            const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+            
+            // USE IPFS.IO as a backup if Pinata fails
+            const imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`; 
+
+            console.log("📸 Rendering Image:", imageUrl);
 
             const cardHtml = `
                 <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
@@ -149,16 +154,20 @@ async function loadProofGallery() {
                         Milestone #${Number(milestoneIndex) + 1} Verified
                     </div>
                     <a href="${imageUrl}" target="_blank">
-                        <img src="${imageUrl}" alt="Proof Image" style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
+                        <img src="${imageUrl}" 
+                             alt="Proof Image" 
+                             style="width: 100%; display: block; min-height: 200px; object-fit: cover;"
+                             onerror="this.src='https://via.placeholder.com/400x200?text=Image+Not+Found+On+IPFS'">
                     </a>
+                    <div style="padding: 5px; font-size: 10px; color: gray;">Hash: ${ipfsHash}</div>
                 </div>
             `;
             gallery.innerHTML += cardHtml;
         });
 
     } catch (error) {
-        console.error("Gallery Error:", error);
-        gallery.innerHTML = `<p style="color: red;">Error loading gallery. See Console.</p>`;
+        console.error("❌ GALLERY ERROR:", error);
+        gallery.innerHTML = `<p style="color: red;">Error loading proofs. Check Console.</p>`;
     }
 }
 // --- BUTTON LISTENERS ---
