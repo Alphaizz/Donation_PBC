@@ -105,57 +105,61 @@ async function updateUI() {
     }
 }
 
-// --- TIMELINE GALLERY FUNCTION ---
+// --- UPDATED TIMELINE GALLERY FUNCTION ---
 async function loadProofGallery() {
     const gallery = document.getElementById("proofGallery");
     if (!gallery) return;
 
-    console.log(`🔍 DEBUG: Searching for events for Project ID: ${PROJECT_ID}...`);
+    // Clear previous content
+    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Loading proofs from blockchain...</p>';
 
     try {
-        // 1. Fetch Events
+        // 1. Fetch ALL verification events (Bypassing the filter bug)
+        // We use 'earliest' instead of 0 to be safer with RPC nodes
         const events = await contract.getPastEvents('MilestoneVerified', {
-            filter: { projectId: PROJECT_ID },
-            fromBlock: 0,
+            fromBlock: 'earliest',
             toBlock: 'latest'
         });
 
-        console.log(`✅ DEBUG: Found ${events.length} verification events.`);
-
-        // 2. Handle Empty State
-        if (events.length === 0) {
-            gallery.innerHTML = `<p style="font-style: italic; color: red;">Debug: Blockchain returned 0 events for ID ${PROJECT_ID}.</p>`;
-            return;
-        }
-
-        // 3. Clear and Render
+        // 2. Clear Loading Text
         gallery.innerHTML = ""; 
-        
-        events.forEach(event => {
-            console.log("📸 Processing Event:", event.returnValues);
-            
-            const milestoneIndex = event.returnValues.milestoneIndex;
-            const ipfsHash = event.returnValues.proofHash;
-            const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
 
-            const cardHtml = `
-                <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
-                    <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
-                        <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
-                        Milestone #${Number(milestoneIndex) + 1} Verified
+        // 3. Manual Filter & Render
+        let foundCount = 0;
+
+        events.forEach(event => {
+            // MANUAL FILTER: Only show events for our Project ID
+            // We convert both to String to ensure they match (e.g. "2" == 2)
+            if (String(event.returnValues.projectId) === String(PROJECT_ID)) {
+                
+                foundCount++;
+                const milestoneIndex = event.returnValues.milestoneIndex;
+                const ipfsHash = event.returnValues.proofHash;
+                const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+
+                const cardHtml = `
+                    <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
+                        <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
+                            <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
+                            Milestone #${Number(milestoneIndex) + 1} Verified
+                        </div>
+                        <a href="${imageUrl}" target="_blank">
+                            <img src="${imageUrl}" alt="Proof" style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
+                        </a>
                     </div>
-                    <a href="${imageUrl}" target="_blank">
-                        <img src="${imageUrl}" alt="Proof Loading..." style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
-                    </a>
-                    <div style="padding:5px; font-size:10px; color:gray; word-break:break-all;">Hash: ${ipfsHash}</div>
-                </div>
-            `;
-            gallery.innerHTML += cardHtml;
+                `;
+                gallery.innerHTML += cardHtml;
+            }
         });
 
+        // 4. Handle "No Events Found" specifically for this ID
+        if (foundCount === 0) {
+            gallery.innerHTML = `<p style="font-style: italic; color: var(--text-muted);">No verified milestones found for Project ${PROJECT_ID}.</p>`;
+        }
+
     } catch (error) {
-        console.error("❌ DEBUG ERROR:", error);
-        gallery.innerHTML = `<p style="color: red;">Error loading proofs. Check Console.</p>`;
+        console.error("Gallery Error:", error);
+        gallery.innerHTML = `<p style="color: red;">Connection Error. Please refresh.</p>`;
     }
 }
 // --- BUTTON LISTENERS ---
