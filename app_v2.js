@@ -105,47 +105,48 @@ async function updateUI() {
     }
 }
 
-// --- FORCE FIX GALLERY FUNCTION ---
+// ==========================================
+// 5. ROBUST GALLERY LOADER
+// ==========================================
+
 async function loadProofGallery() {
     const gallery = document.getElementById("proofGallery");
     if (!gallery) return;
 
-    // 1. Show Loading State
-    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Scanning for proofs...</p>';
+    gallery.innerHTML = '<p style="color: gray; font-style: italic;">Scanning blockchain history...</p>';
 
     try {
-        // 2. Fetch ALL events (Bypassing filters)
+        // 1. Get ALL events (Bypassing filters)
         const events = await contract.getPastEvents('MilestoneVerified', {
-            fromBlock: 5000000,
+            fromBlock: 0,
             toBlock: 'latest'
         });
 
-        console.log("🔍 DEBUG: Found Total Events:", events.length);
+        console.log(`🔍 Found ${events.length} total events on contract.`);
 
-        // 3. Filter for CURRENT Project ID
+        // 2. Filter for THIS Project ID
         const projectEvents = events.filter(event => 
             String(event.returnValues.projectId) === String(PROJECT_ID)
         );
 
-        console.log(`✅ DEBUG: Events for Project ${PROJECT_ID}:`, projectEvents.length);
+        console.log(`✅ Events for Project ${PROJECT_ID}:`, projectEvents.length);
 
-        // 4. Handle "No Events"
         if (projectEvents.length === 0) {
             gallery.innerHTML = `<p style="font-style: italic; color: var(--text-muted);">No verified proofs found for Project #${PROJECT_ID} yet.</p>`;
             return;
         }
 
-        // 5. Clear and Render
+        // 3. Clear and Render
         gallery.innerHTML = ""; 
         
         projectEvents.forEach(event => {
             const milestoneIndex = event.returnValues.milestoneIndex;
             const ipfsHash = event.returnValues.proofHash;
             
-            // USE IPFS.IO as a backup if Pinata fails
-            const imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`; 
-
-            console.log("📸 Rendering Image:", imageUrl);
+            // Try Cloudflare first (usually fastest), then Pinata, then IPFS.io
+            const primaryUrl = `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`;
+            const backupUrl1 = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+            const backupUrl2 = `https://ipfs.io/ipfs/${ipfsHash}`;
 
             const cardHtml = `
                 <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
@@ -153,13 +154,16 @@ async function loadProofGallery() {
                         <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
                         Milestone #${Number(milestoneIndex) + 1} Verified
                     </div>
-                    <a href="${imageUrl}" target="_blank">
-                        <img src="${imageUrl}" 
-                             alt="Proof Image" 
+                    <a href="${primaryUrl}" target="_blank">
+                        <img src="${primaryUrl}" 
+                             alt="Proof" 
                              style="width: 100%; display: block; min-height: 200px; object-fit: cover;"
-                             onerror="this.src='https://via.placeholder.com/400x200?text=Image+Not+Found+On+IPFS'">
+                             onerror="this.onerror=null; this.src='${backupUrl1}'; console.log('Trying backup 1...');"
+                        >
                     </a>
-                    <div style="padding: 5px; font-size: 10px; color: gray;">Hash: ${ipfsHash}</div>
+                    <div style="padding: 5px; font-size: 10px; color: gray;">
+                        Hash: <a href="${backupUrl2}" target="_blank" style="color: #2563eb;">${ipfsHash.substring(0, 15)}...</a>
+                    </div>
                 </div>
             `;
             gallery.innerHTML += cardHtml;
