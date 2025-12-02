@@ -30,7 +30,7 @@ const CONTRACT_ABI = [
 let web3;
 let contract;
 let userAccount;
-const PROJECT_ID = 1; // Assuming Project #1 is the main active one
+const PROJECT_ID = 2; // Assuming Project #1 is the main active one
 
 const connectBtn = document.getElementById("connectButton");
 const donateBtn = document.getElementById("donateButton");
@@ -68,11 +68,18 @@ function handleLogin(account) {
     updateUI();
 }
 
-// Manual Create Function (Call in Console: window.createProjectIfMissing())
 window.createProjectIfMissing = async function() {
     try {
-        await contract.methods.createProject(userAccount, "Clean Water #1", web3.utils.toWei("0.01", "ether"), 4).send({from: userAccount});
-        console.log("Project created");
+        // New Title: "School Foundation"
+        // New Goal: "0.02" ETH
+        await contract.methods.createProject(
+            userAccount, 
+            "School Foundation", 
+            web3.utils.toWei("0.02", "ether"), 
+            4
+        ).send({from: userAccount});
+
+        console.log("Project 2 Created!");
     } catch(e) { console.log(e); }
 }
 
