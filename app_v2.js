@@ -103,38 +103,54 @@ async function loadProofGallery() {
     const gallery = document.getElementById("proofGallery");
     if (!gallery) return;
 
-    // Get past events from blockchain
-    const events = await contract.getPastEvents('MilestoneVerified', {
-        filter: { projectId: PROJECT_ID },
-        fromBlock: 0,
-        toBlock: 'latest'
-    });
+    console.log(`🔍 DEBUG: Searching for events for Project ID: ${PROJECT_ID}...`);
 
-    if (events.length > 0) {
-        gallery.innerHTML = ""; // Clear default text
-    }
+    try {
+        // 1. Fetch Events
+        const events = await contract.getPastEvents('MilestoneVerified', {
+            filter: { projectId: PROJECT_ID },
+            fromBlock: 0,
+            toBlock: 'latest'
+        });
 
-    // Loop through events and create image cards
-    events.forEach(event => {
-        const milestoneIndex = event.returnValues.milestoneIndex;
-        const ipfsHash = event.returnValues.proofHash;
-        const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+        console.log(`✅ DEBUG: Found ${events.length} verification events.`);
 
-        const cardHtml = `
-            <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
-                <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
-                    <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
-                    Milestone #${Number(milestoneIndex) + 1} Verified
+        // 2. Handle Empty State
+        if (events.length === 0) {
+            gallery.innerHTML = `<p style="font-style: italic; color: red;">Debug: Blockchain returned 0 events for ID ${PROJECT_ID}.</p>`;
+            return;
+        }
+
+        // 3. Clear and Render
+        gallery.innerHTML = ""; 
+        
+        events.forEach(event => {
+            console.log("📸 Processing Event:", event.returnValues);
+            
+            const milestoneIndex = event.returnValues.milestoneIndex;
+            const ipfsHash = event.returnValues.proofHash;
+            const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+
+            const cardHtml = `
+                <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
+                    <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
+                        <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
+                        Milestone #${Number(milestoneIndex) + 1} Verified
+                    </div>
+                    <a href="${imageUrl}" target="_blank">
+                        <img src="${imageUrl}" alt="Proof Loading..." style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
+                    </a>
+                    <div style="padding:5px; font-size:10px; color:gray; word-break:break-all;">Hash: ${ipfsHash}</div>
                 </div>
-                <a href="${imageUrl}" target="_blank">
-                    <img src="${imageUrl}" alt="Proof" style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
-                </a>
-            </div>
-        `;
-        gallery.innerHTML += cardHtml;
-    });
-}
+            `;
+            gallery.innerHTML += cardHtml;
+        });
 
+    } catch (error) {
+        console.error("❌ DEBUG ERROR:", error);
+        gallery.innerHTML = `<p style="color: red;">Error loading proofs. Check Console.</p>`;
+    }
+}
 // --- BUTTON LISTENERS ---
 
 connectBtn.addEventListener('click', async () => {
