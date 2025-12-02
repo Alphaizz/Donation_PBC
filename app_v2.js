@@ -30,7 +30,7 @@ const CONTRACT_ABI = [
 let web3;
 let contract;
 let userAccount;
-const PROJECT_ID = 2; // Assuming Project #1 is the main active one
+const PROJECT_ID = 12; // Assuming Project #1 is the main active one
 
 const connectBtn = document.getElementById("connectButton");
 const donateBtn = document.getElementById("donateButton");
