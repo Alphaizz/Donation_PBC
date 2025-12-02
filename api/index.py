@@ -5,11 +5,11 @@ import os
 
 app = Flask(__name__)
 CORS(app)
-
+"""
 @app.route('/')
 def home():
     return "TrustFlow API is running!"
-
+"""
 @app.route('/api/upload-proof', methods=['POST'])
 def upload_proof():
     if 'file' not in request.files:
