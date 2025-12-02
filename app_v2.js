@@ -116,7 +116,7 @@ async function loadProofGallery() {
     try {
         // 2. Fetch ALL events (Bypassing filters)
         const events = await contract.getPastEvents('MilestoneVerified', {
-            fromBlock: 0,
+            fromBlock: 5000000,
             toBlock: 'latest'
         });
 
