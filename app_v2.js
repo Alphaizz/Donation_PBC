@@ -5,7 +5,7 @@
 // Your Sepolia V2 Contract Address
 const CONTRACT_ADDRESS = "0xBA4fd9e889e6535B272a22c0b29A280a91d68686"; 
 
-// Your V2 ABI (Includes totalRaised output in getProject)
+// Your V2 ABI (Includes totalRaised output)
 const CONTRACT_ABI = [
   { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
   { "anonymous": false, "inputs": [{ "indexed": true, "internalType": "uint256", "name": "projectId", "type": "uint256" }, { "indexed": true, "internalType": "address", "name": "donor", "type": "address" }, { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "DonationReceived", "type": "event" },
@@ -29,18 +29,17 @@ const CONTRACT_ABI = [
 let web3;
 let contract;
 let userAccount;
-const PROJECT_ID = 1; // Using ID 12 based on your request
+const PROJECT_ID = 1; // ID 1 for new contract
 
 const connectBtn = document.getElementById("connectButton");
 const donateBtn = document.getElementById("donateButton");
 const uploadBtn = document.getElementById("uploadButton");
 const verifyBtn = document.getElementById("verifyButton");
 
-// --- PASSIVE AUTO CONNECT (No Popup) ---
+// --- PASSIVE AUTO CONNECT ---
 window.addEventListener('load', async () => {
     if (window.ethereum) {
         web3 = new Web3(window.ethereum);
-        // Check permissions only, do not force popup
         const accounts = await web3.eth.getAccounts(); 
         if (accounts.length > 0) {
             handleLogin(accounts[0]);
@@ -62,37 +61,32 @@ function handleLogin(account) {
     // Initialize Contract
     contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
     
-    // ❌ AUTO-POPUP DISABLED (Use console to create if needed: window.createProjectIfMissing()) ❌
-    // createProjectIfMissing();
-    
-    // Load Data
+    // Auto-popup disabled. Run "window.createProjectIfMissing()" in console if needed.
     updateUI();
 }
 
-// Function exposed to window so you can call it manually from Console if needed
+// Function exposed to window for manual creation
 window.createProjectIfMissing = async function() {
     try {
-        await contract.methods.createProject(userAccount, "Clean Water #12", web3.utils.toWei("0.01", "ether"), 4).send({from: userAccount});
+        await contract.methods.createProject(userAccount, "Clean Water #1", web3.utils.toWei("0.01", "ether"), 4).send({from: userAccount});
         console.log("Project created");
-    } catch(e) {}
+    } catch(e) { console.log(e); }
 }
 
 async function updateUI() {
     try {
         const data = await contract.methods.getProject(PROJECT_ID).call();
         
-        // Update UI Elements
         document.getElementById("projectTitle").innerText = data[0];
         document.getElementById("projectGoal").innerText = web3.utils.fromWei(data[1], "ether") + " ETH";
         
-        // IMPORTANT: Use data[3] (Total Raised) instead of data[2] (Current Balance)
-        // Adjust index 2 vs 3 based on your contract return order
+        // Use data[3] (Total Raised) to prevent number going down
         document.getElementById("amountRaised").innerText = web3.utils.fromWei(data[3], "ether") + " ETH";
         
         document.getElementById("currentMilestone").innerText = data[4];
         document.getElementById("totalMilestones").innerText = data[5];
     } catch(e) {
-        console.log("Project not found yet.");
+        console.log("Project not found yet. Run createProjectIfMissing() in console.");
     }
 }
 
@@ -120,8 +114,6 @@ donateBtn.addEventListener('click', async () => {
 
         document.getElementById("donateStatus").innerText = "Success!";
         updateUI();
-        
-        // Show Receipt Popup
         showReceipt(amount, receipt.transactionHash);
 
     } catch (e) {
@@ -139,9 +131,11 @@ uploadBtn.addEventListener('click', async () => {
 
     document.getElementById("uploadStatus").innerText = "Uploading to IPFS...";
 
+    // Vercel Path
     const res = await fetch("/api/upload-proof", { 
-    method: "POST", 
-    body: formData });
+        method: "POST", 
+        body: formData 
+    });
 
     const data = await res.json();
     
@@ -167,9 +161,7 @@ verifyBtn.addEventListener('click', async () => {
     }
 });
 
-// ==========================================
-// 3. DARK MODE LOGIC
-// ==========================================
+// --- DARK MODE LOGIC ---
 const themeBtn = document.getElementById('themeToggle');
 const body = document.body;
 const icon = themeBtn.querySelector('i');
@@ -196,47 +188,32 @@ themeBtn.addEventListener('click', () => {
     }
 });
 
-// ==========================================
-// 4. RECEIPT FUNCTIONS
-// ==========================================
-
+// --- RECEIPT FUNCTIONS ---
 function showReceipt(amount, txHash) {
     const now = new Date();
-    
     document.getElementById("r-date").innerText = now.toLocaleDateString().toUpperCase();
     document.getElementById("r-time").innerText = now.toLocaleTimeString();
     document.getElementById("r-donor").innerText = userAccount.substring(0,6) + "..." + userAccount.substring(38);
     document.getElementById("r-amount").innerText = amount + " ETH";
     document.getElementById("r-total").innerText = amount + " ETH";
     document.getElementById("r-hash").innerText = txHash.substring(0, 8).toUpperCase(); 
-
     document.getElementById("receiptModal").style.display = "flex";
 }
 
 window.downloadReceipt = async function() {
     const receiptContent = document.querySelector(".receipt-paper");
     const buttons = receiptContent.querySelectorAll(".btn"); 
-
-    // Hide buttons for screenshot
     buttons.forEach(btn => btn.style.display = "none");
-
     try {
-        const canvas = await html2canvas(receiptContent, {
-            scale: 2, 
-            useCORS: true, 
-            backgroundColor: null 
-        });
-
+        const canvas = await html2canvas(receiptContent, { scale: 2, useCORS: true, backgroundColor: null });
         const image = canvas.toDataURL("image/png");
         const link = document.createElement("a");
         link.href = image;
         link.download = `TrustFlow_Receipt_${Date.now()}.png`;
         link.click();
-
     } catch (error) {
         alert("Oops! Could not generate image.");
     } finally {
-        // Show buttons again
         buttons.forEach(btn => btn.style.display = "inline-block");
     }
 }
