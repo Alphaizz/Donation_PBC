@@ -5,17 +5,18 @@
 // Your Sepolia V2 Contract Address
 const CONTRACT_ADDRESS = "0xBA4fd9e889e6535B272a22c0b29A280a91d68686"; 
 
-// Your V2 ABI (Includes totalRaised output)
+// Your V2 ABI
 const CONTRACT_ABI = [
   { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
   { "anonymous": false, "inputs": [{ "indexed": true, "internalType": "uint256", "name": "projectId", "type": "uint256" }, { "indexed": true, "internalType": "address", "name": "donor", "type": "address" }, { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "DonationReceived", "type": "event" },
+  { "anonymous": false, "inputs": [{ "indexed": true, "internalType": "uint256", "name": "projectId", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "milestoneIndex", "type": "uint256" }, { "indexed": false, "internalType": "string", "name": "proofHash", "type": "string" }], "name": "MilestoneVerified", "type": "event" },
   { "inputs": [{ "internalType": "address payable", "name": "_charity", "type": "address" }, { "internalType": "string", "name": "_title", "type": "string" }, { "internalType": "uint256", "name": "_goal", "type": "uint256" }, { "internalType": "uint256", "name": "_milestones", "type": "uint256" }], "name": "createProject", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
   { "inputs": [{ "internalType": "uint256", "name": "_projectId", "type": "uint256" }], "name": "donate", "outputs": [], "stateMutability": "payable", "type": "function" },
   { "inputs": [{ "internalType": "uint256", "name": "_projectId", "type": "uint256" }], "name": "getProject", "outputs": [
       { "internalType": "string", "name": "", "type": "string" }, 
       { "internalType": "uint256", "name": "", "type": "uint256" }, 
-      { "internalType": "uint256", "name": "", "type": "uint256" }, // Current Balance
-      { "internalType": "uint256", "name": "", "type": "uint256" }, // Total Raised (History)
+      { "internalType": "uint256", "name": "", "type": "uint256" }, 
+      { "internalType": "uint256", "name": "", "type": "uint256" }, 
       { "internalType": "uint256", "name": "", "type": "uint256" }, 
       { "internalType": "uint256", "name": "", "type": "uint256" }
     ], "stateMutability": "view", "type": "function" },
@@ -29,7 +30,7 @@ const CONTRACT_ABI = [
 let web3;
 let contract;
 let userAccount;
-const PROJECT_ID = 1; // ID 1 for new contract
+const PROJECT_ID = 1; // Assuming Project #1 is the main active one
 
 const connectBtn = document.getElementById("connectButton");
 const donateBtn = document.getElementById("donateButton");
@@ -44,6 +45,8 @@ window.addEventListener('load', async () => {
         if (accounts.length > 0) {
             handleLogin(accounts[0]);
         }
+    } else {
+        console.log("MetaMask not found");
     }
 });
 
@@ -51,7 +54,7 @@ function handleLogin(account) {
     userAccount = account;
     window.userAccount = account;
     
-    // UI Updates
+    // Update Navbar UI
     const wrapper = document.getElementById("connectWrapper");
     const badge = document.getElementById("walletDisplay");
     if(wrapper) wrapper.style.display = "none";
@@ -61,11 +64,11 @@ function handleLogin(account) {
     // Initialize Contract
     contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
     
-    // Auto-popup disabled. Run "window.createProjectIfMissing()" in console if needed.
+    // Load Dashboard Data
     updateUI();
 }
 
-// Function exposed to window for manual creation
+// Manual Create Function (Call in Console: window.createProjectIfMissing())
 window.createProjectIfMissing = async function() {
     try {
         await contract.methods.createProject(userAccount, "Clean Water #1", web3.utils.toWei("0.01", "ether"), 4).send({from: userAccount});
@@ -75,20 +78,64 @@ window.createProjectIfMissing = async function() {
 
 async function updateUI() {
     try {
+        // 1. Get Project Stats
         const data = await contract.methods.getProject(PROJECT_ID).call();
         
         document.getElementById("projectTitle").innerText = data[0];
         document.getElementById("projectGoal").innerText = web3.utils.fromWei(data[1], "ether") + " ETH";
         
-        // Use data[3] (Total Raised) to prevent number going down
+        // Show Total Raised (Index 3), NOT Balance
         document.getElementById("amountRaised").innerText = web3.utils.fromWei(data[3], "ether") + " ETH";
         
         document.getElementById("currentMilestone").innerText = data[4];
         document.getElementById("totalMilestones").innerText = data[5];
+
+        // 2. Load The Timeline Images
+        loadProofGallery();
+
     } catch(e) {
-        console.log("Project not found yet. Run createProjectIfMissing() in console.");
+        console.log("Project data not found yet.");
     }
 }
+
+// --- TIMELINE GALLERY FUNCTION ---
+async function loadProofGallery() {
+    const gallery = document.getElementById("proofGallery");
+    if (!gallery) return;
+
+    // Get past events from blockchain
+    const events = await contract.getPastEvents('MilestoneVerified', {
+        filter: { projectId: PROJECT_ID },
+        fromBlock: 0,
+        toBlock: 'latest'
+    });
+
+    if (events.length > 0) {
+        gallery.innerHTML = ""; // Clear default text
+    }
+
+    // Loop through events and create image cards
+    events.forEach(event => {
+        const milestoneIndex = event.returnValues.milestoneIndex;
+        const ipfsHash = event.returnValues.proofHash;
+        const imageUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+
+        const cardHtml = `
+            <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
+                <div style="background: var(--bg); padding: 10px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text-main);">
+                    <i class="fa-solid fa-check-circle" style="color: var(--success);"></i> 
+                    Milestone #${Number(milestoneIndex) + 1} Verified
+                </div>
+                <a href="${imageUrl}" target="_blank">
+                    <img src="${imageUrl}" alt="Proof" style="width: 100%; display: block; min-height: 200px; object-fit: cover;">
+                </a>
+            </div>
+        `;
+        gallery.innerHTML += cardHtml;
+    });
+}
+
+// --- BUTTON LISTENERS ---
 
 connectBtn.addEventListener('click', async () => {
     try {
@@ -131,7 +178,7 @@ uploadBtn.addEventListener('click', async () => {
 
     document.getElementById("uploadStatus").innerText = "Uploading to IPFS...";
 
-    // Vercel Path
+    // Vercel API Path
     const res = await fetch("/api/upload-proof", { 
         method: "POST", 
         body: formData 
@@ -157,11 +204,13 @@ verifyBtn.addEventListener('click', async () => {
         updateUI();
         document.getElementById("verifyStatus").innerText = "Success";
     } catch(e) {
-        document.getElementById("verifyStatus").innerText = "Failed.";
+        document.getElementById("verifyStatus").innerText = "Failed. (Check wallet or proof)";
     }
 });
 
-// --- DARK MODE LOGIC ---
+// ==========================================
+// 3. DARK MODE LOGIC
+// ==========================================
 const themeBtn = document.getElementById('themeToggle');
 const body = document.body;
 const icon = themeBtn.querySelector('i');
@@ -188,7 +237,10 @@ themeBtn.addEventListener('click', () => {
     }
 });
 
-// --- RECEIPT FUNCTIONS ---
+// ==========================================
+// 4. RECEIPT FUNCTIONS
+// ==========================================
+
 function showReceipt(amount, txHash) {
     const now = new Date();
     document.getElementById("r-date").innerText = now.toLocaleDateString().toUpperCase();
