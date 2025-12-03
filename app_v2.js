@@ -116,15 +116,17 @@ async function loadProofGallery() {
     gallery.innerHTML = '<p style="color: gray; font-style: italic;">Scanning blockchain history...</p>';
 
     try {
-        // 1. Get ALL events (Bypassing filters)
+        // 1. Fetch ALL events using a SAFE block range
+        // We start at block 5,000,000 to save the node from scanning "Ancient History"
         const events = await contract.getPastEvents('MilestoneVerified', {
-            fromBlock: 0,
+            fromBlock: 5000000, 
             toBlock: 'latest'
         });
 
         console.log(`🔍 Found ${events.length} total events on contract.`);
 
         // 2. Filter for THIS Project ID
+        // We convert both to String to ensure "2" equals 2
         const projectEvents = events.filter(event => 
             String(event.returnValues.projectId) === String(PROJECT_ID)
         );
@@ -146,7 +148,6 @@ async function loadProofGallery() {
             // Try Cloudflare first (usually fastest), then Pinata, then IPFS.io
             const primaryUrl = `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`;
             const backupUrl1 = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-            const backupUrl2 = `https://ipfs.io/ipfs/${ipfsHash}`;
 
             const cardHtml = `
                 <div style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
@@ -158,12 +159,10 @@ async function loadProofGallery() {
                         <img src="${primaryUrl}" 
                              alt="Proof" 
                              style="width: 100%; display: block; min-height: 200px; object-fit: cover;"
-                             onerror="this.onerror=null; this.src='${backupUrl1}'; console.log('Trying backup 1...');"
+                             onerror="this.onerror=null; this.src='${backupUrl1}'; console.log('Trying backup gateway...');"
                         >
                     </a>
-                    <div style="padding: 5px; font-size: 10px; color: gray;">
-                        Hash: <a href="${backupUrl2}" target="_blank" style="color: #2563eb;">${ipfsHash.substring(0, 15)}...</a>
-                    </div>
+                    <div style="padding: 5px; font-size: 10px; color: gray;">Hash: ${ipfsHash}</div>
                 </div>
             `;
             gallery.innerHTML += cardHtml;
